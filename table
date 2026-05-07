@@ -1,0 +1,46 @@
+1. Chọn Cơ sở dữ liệu để làm việc
+USE shoe_store;
+
+-- 2. Tạo bảng USERS (Tài khoản)
+CREATE TABLE IF NOT EXISTS users (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    username VARCHAR(50) NOT NULL UNIQUE,
+    password VARCHAR(255) NOT NULL,
+    email VARCHAR(100) NOT NULL,
+    dob DATE,
+    location VARCHAR(100),
+    role VARCHAR(20) DEFAULT 'staff', -- Phân quyền: admin hoặc staff
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- 3. Tạo bảng SHOES (Kho giày)
+CREATE TABLE IF NOT EXISTS shoes (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    sku VARCHAR(50) NOT NULL UNIQUE,  -- Mã giày không được trùng
+    name VARCHAR(100) NOT NULL,
+    brand VARCHAR(50) NOT NULL,
+    size INT NOT NULL,
+    quantity INT DEFAULT 0,
+    price DECIMAL(15, 0) NOT NULL,    -- Giá tiền
+    image VARCHAR(255) DEFAULT 'no-image.png', -- Cột ảnh (Mới thêm)
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+CREATE TABLE IF NOT EXISTS sales (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    user_id INT NOT NULL,          -- Ai là người bán đơn này
+    product_name VARCHAR(100),     -- Tên giày
+    quantity INT,                  -- Số lượng bán
+    total_price DECIMAL(15, 0),    -- Tổng tiền đơn hàng
+   
+    sale_date TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- 2. Thêm cột cost_price vào bảng SHOES
+ALTER TABLE shoes 
+ADD COLUMN cost_price DECIMAL(15, 0) NOT NULL DEFAULT 0;
+
+-- 3. Thêm cột unit_cost_price vào bảng SALES
+ALTER TABLE sales
+ADD COLUMN unit_cost_price DECIMAL(15, 0) NOT NULL;
+
+ALTER TABLE users ADD COLUMN remember_token VARCHAR(255) NULL;
