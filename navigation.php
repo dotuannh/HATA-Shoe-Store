@@ -5,7 +5,7 @@ $current_page = basename($_SERVER['PHP_SELF']);
 <nav class="navbar">
     <a href="pos.php" class="nav-brand">
         <img src="logo.png" alt="Logo">
-        Shoe Store POS
+        HATA - SHOE STORE 
     </a>
     
     <ul class="nav-links">
@@ -22,6 +22,12 @@ $current_page = basename($_SERVER['PHP_SELF']);
         <li>
             <a href="sales_history.php" class="<?php echo ($current_page == 'sales_history.php') ? 'active' : ''; ?>">
                 Sales History
+            </a>
+        </li>
+
+        <li>
+            <a href="customer_list.php" class="<?php echo ($current_page == 'customer_list.php') ? 'active' : ''; ?>" style="color: #9c754d;">
+                Customer List
             </a>
         </li>
 

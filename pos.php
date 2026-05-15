@@ -41,6 +41,7 @@ if (isset($_POST['add_to_cart'])) {
                         'id'=>$id, 
                         'name'=>$name_with_size,
                         'price'=>$product['price'], 
+                        'cost_price'=>$product['cost_price'], /* ĐÃ SỬA: Lấy giá vốn từ Database lưu vào giỏ */
                         'qty'=>$buy_qty, 
                         'max_qty'=>$max_qty
                     ];
@@ -63,21 +64,52 @@ if (isset($_GET['remove'])) {
 if (isset($_POST['checkout'])) {     //thanh toán//
     if (!empty($_SESSION['cart'])) {
         $user_id = $_SESSION['user_id'];
-        $conn->begin_transaction();
-        try {
-            foreach ($_SESSION['cart'] as $item) {
-                $pid = $item['id']; $qty = $item['qty']; $total = $item['price'] * $qty; $pname = $item['name'];
-                $conn->query("UPDATE shoes SET quantity = quantity - $qty WHERE id = $pid");
-                $stmt = $conn->prepare("INSERT INTO sales (user_id, product_name, quantity, total_price) VALUES (?, ?, ?, ?)");
-                $stmt->bind_param("isid", $user_id, $pname, $qty, $total);
+        $customer_name = $conn->real_escape_string($_POST['customer_name'] ?? '');
+        $customer_phone = $conn->real_escape_string($_POST['customer_phone'] ?? '');
+        
+        if (empty($customer_name) || empty($customer_phone)) {
+            $message = "Vui lòng nhập tên và số điện thoại khách hàng!"; $message_type = "error";
+        } else {
+            $conn->begin_transaction();
+            try {
+                $grand_total = 0;
+                $items_count = 0;
+                
+                foreach ($_SESSION['cart'] as $item) {
+                    $pid = $item['id']; 
+                    $qty = $item['qty']; 
+                    $total = $item['price'] * $qty; 
+                    $pname = $item['name'];
+                    $cost = $item['cost_price'] ?? 0; /* ĐÃ SỬA: Lôi giá vốn từ giỏ hàng ra */
+
+                    // Trừ số lượng kho
+                    $conn->query("UPDATE shoes SET quantity = quantity - $qty WHERE id = $pid");
+                    
+                    // ĐÃ SỬA: Thêm cột unit_cost_price vào lệnh INSERT và đổi bind_param thành "isidd"
+$stmt = $conn->prepare("INSERT INTO sales (user_id, product_id, product_name, quantity, unit_cost_price, total_price, customer_name, customer_phone) VALUES (?, ?, ?, ?, ?, ?, ?, ?)");
+                $stmt->bind_param("iisiddss", $user_id, $pid, $pname, $qty, $cost, $total, $customer_name, $customer_phone);
                 $stmt->execute();
+                
+                $grand_total += $total;
+                $items_count += $qty;
             }
             $conn->commit();
+            
+            // Lưu thông tin đơn hàng vào session
+            $_SESSION['last_order_info'] = [
+                'customer_name' => $customer_name,
+                'customer_phone' => $customer_phone,
+                'items_count' => $items_count,
+                'total_amount' => $grand_total
+            ];
+            
             $_SESSION['cart'] = [];
-            $message = "Payment Successful!"; $message_type = "success";
-        } catch (Exception $e) {
-            $conn->rollback();
-            $message = "Error: " . $e->getMessage(); $message_type = "error";
+            header("Location: payment_success.php");
+            exit;
+            } catch (Exception $e) {
+                $conn->rollback();
+                $message = "Error: " . $e->getMessage(); $message_type = "error";
+            }
         }
     } else { $message = "Cart is empty!"; $message_type = "error"; }
 }
@@ -105,7 +137,7 @@ while($row = $raw_data->fetch_assoc()) {        //lấy từng dữ liệu gán 
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>POS System</title>
+    <title>SHOE STORES</title>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
     <link rel="stylesheet" href="style.css?v=<?php echo time(); ?>">
     <style>
@@ -155,8 +187,7 @@ while($row = $raw_data->fetch_assoc()) {        //lấy từng dữ liệu gán 
         <?php if ($message): ?>
             <div class="message <?php echo $message_type; ?>" style="margin-bottom: 10px;"><?php echo $message; ?></div>
         <?php endif; ?>
-
-        <div class="pos-layout">
+<div class="pos-layout">
             
             <div class="pos-products-area">
                 
@@ -201,8 +232,7 @@ while($row = $raw_data->fetch_assoc()) {        //lấy từng dữ liệu gán 
                         </div>
                     <?php endforeach; ?>
                 </div>
-                
-                <div id="noResults" style="display:none; text-align:center; padding: 20px; color: #888;">
+<div id="noResults" style="display:none; text-align:center; padding: 20px; color: #888;">
                     <i class="fas fa-search" style="font-size: 2rem; margin-bottom: 10px;"></i>
                     <p>No products found.</p>
                 </div>
@@ -248,9 +278,12 @@ while($row = $raw_data->fetch_assoc()) {        //lấy từng dữ liệu gán 
                         <span style="color: var(--primary-color);"><?php echo number_format($grand_total ?? 0); ?> VND</span>
                     </div>
                     <?php if (!empty($_SESSION['cart'])): ?>
-                    <form method="POST">
-                        <button type="submit" name="checkout" class="btn-pay" onclick="return confirm('Confirm payment?');">
-                            <i class="fas fa-money-bill-wave"></i> PAY NOW
+                    <form method="POST" id="checkoutForm">
+                        <input type="hidden" name="checkout" value="1">
+                        <input type="hidden" name="customer_name" id="customerName" value="">
+                        <input type="hidden" name="customer_phone" id="customerPhone" value="">
+                        <button type="button" class="btn-pay" onclick="openCustomerModal();">
+                            PAY NOW
                         </button>
                     </form>
                     <?php endif; ?>
@@ -260,8 +293,26 @@ while($row = $raw_data->fetch_assoc()) {        //lấy từng dữ liệu gán 
         </div>
     </div>
 
+    <!-- Modal nhập thông tin khách hàng -->
+    <div id="customerModal" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 1000; justify-content: center; align-items: center;">
+        <div style="background: white; padding: 30px; border-radius: 12px; box-shadow: 0 4px 20px rgba(0,0,0,0.2); width: 90%; max-width: 400px;">
+            <h3 style="margin-top: 0; color: var(--primary-color);">Nhập Thông Tin Khách Hàng</h3>
+            
+            <label style="display: block; margin-bottom: 5px; color: #333; font-weight: bold;">Tên khách hàng:</label>
+            <input type="text" id="inputCustomerName" placeholder="Nhập tên..." style="width: 100%; padding: 10px; border: 1px solid #ccc; border-radius: 6px; box-sizing: border-box; margin-bottom: 15px; font-size: 1rem;">
+            
+            <label style="display: block; margin-bottom: 5px; color: #333; font-weight: bold;">Số điện thoại:</label>
+            <input type="tel" id="inputCustomerPhone" placeholder="Nhập số điện thoại (9-11 chữ số)..." style="width: 100%; padding: 10px; border: 1px solid #ccc; border-radius: 6px; box-sizing: border-box; margin-bottom: 20px; font-size: 1rem;">
+            
+            <div style="display: flex; gap: 10px;">
+                <button onclick="submitPayment();" style="flex: 1; padding: 12px; background: var(--primary-color); color: white; border: none; border-radius: 6px; font-weight: bold; cursor: pointer; font-size: 1rem;">Thanh Toán</button>
+                <button onclick="closeCustomerModal();" style="flex: 1; padding: 12px; background: #ccc; color: #333; border: none; border-radius: 6px; font-weight: bold; cursor: pointer; font-size: 1rem;">Hủy</button>
+            </div>
+        </div>
+    </div>
+
     <script>
-        document.getElementById('posSearch').addEventListener('keyup', function() {
+document.getElementById('posSearch').addEventListener('keyup', function() {
             let filter = this.value.toLowerCase();
             let items = document.querySelectorAll('.pos-item');
             let hasResults = false;
@@ -284,6 +335,45 @@ while($row = $raw_data->fetch_assoc()) {        //lấy từng dữ liệu gán 
                 noResDiv.style.display = "none";
             }
         });
+        
+        function openCustomerModal() {
+            document.getElementById('customerModal').style.display = 'flex';
+        }
+        
+        function closeCustomerModal() {
+            document.getElementById('customerModal').style.display = 'none';
+        }
+        
+        function submitPayment() {
+            let name = document.getElementById('inputCustomerName').value.trim();
+            let phone = document.getElementById('inputCustomerPhone').value.trim();
+            
+            if (!name) {
+                alert('Vui lòng nhập tên khách hàng!');
+                return;
+            }
+            if (!phone) {
+                alert('Vui lòng nhập số điện thoại!');
+                return;
+            }
+            if (!/^[0-9]{9,11}$/.test(phone)) {
+                alert('Số điện thoại phải từ 9-11 chữ số!');
+                return;
+            }
+            
+            document.getElementById('customerName').value = name;
+            document.getElementById('customerPhone').value = phone;
+            document.getElementById('checkoutForm').submit();
+            closeCustomerModal();
+        }
+        
+        // Đóng modal khi click bên ngoài
+        window.onclick = function(event) {
+            let modal = document.getElementById('customerModal');
+            if (event.target == modal) {
+                modal.style.display = 'none';
+            }
+        }
     </script>
 </body>
 </html>

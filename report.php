@@ -2,13 +2,16 @@
 require_once 'db.php';
 check_login();
 
-//1. TÍNH DOANH THU, GIÁ VỐN & LỢI NHUẬN HÔM NAY
+// Lấy ngày được chọn từ form (mặc định là hôm nay)
+$selected_date = isset($_POST['report_date']) ? $_POST['report_date'] : date('Y-m-d');
 $today = date('Y-m-d');
+
+//1. TÍNH DOANH THU, GIÁ VỐN & LỢI NHUẬN CHO NGÀY ĐƯỢC CHỌN
 $sql_today = "SELECT 
                 SUM(total_price) as today_revenue,
                 SUM(unit_cost_price * quantity) as today_cogs 
               FROM sales 
-              WHERE DATE(sale_date) = '$today'";
+              WHERE DATE(sale_date) = '$selected_date'";
 $result_today = $conn->query($sql_today)->fetch_assoc();
 $revenue_today = $result_today['today_revenue'] ?? 0;
 $cogs_today = $result_today['today_cogs'] ?? 0; 
@@ -26,12 +29,13 @@ $sql_daily = "SELECT
               ORDER BY report_date DESC";
 $result_daily = $conn->query($sql_daily);
 
-//3. BÁO CÁO TOP 5 SẢN PHẨM BÁN CHẠY NHẤT
+//3. BÁO CÁO TOP 5 SẢN PHẨM BÁN CHẠY NHẤT (cho ngày được chọn)
 $sql_top_sellers = "SELECT 
                         product_name, 
                         SUM(quantity) as total_sold,
                         SUM(total_price) as total_revenue
                     FROM sales 
+                    WHERE DATE(sale_date) = '$selected_date'
                     GROUP BY product_name 
                     ORDER BY total_sold DESC 
                     LIMIT 5";
@@ -87,28 +91,37 @@ $conn->close();
 
     <div class="container">
         
+        <!-- Form chọn ngày -->
+        <div style="margin-bottom: 25px; padding: 15px; background: #f8f9fa; border-radius: 8px; display: flex; gap: 10px; align-items: center;">
+            <form method="POST" style="display: flex; gap: 10px; align-items: center;">
+                <label style="font-weight: bold; margin: 0;">Chọn Ngày:</label>
+                <input type="date" name="report_date" value="<?php echo $selected_date; ?>" style="padding: 8px; border: 1px solid #ccc; border-radius: 5px; font-size: 1rem;">
+                <button type="submit" style="padding: 8px 20px; background: var(--primary-color); color: white; border: none; border-radius: 5px; cursor: pointer; font-weight: bold;">Xem</button>
+            </form>
+        </div>
+        
         <div class="report-header">
             
             <div class="summary-card revenue">
-                <h3><i class="fas fa-calendar-day"></i> Today's Revenue</h3>
+                <h3>Revenue</h3>
                 <div class="money"><?php echo number_format($revenue_today); ?> ₫</div>
-                <small><?php echo date("d/m/Y"); ?></small>
+                <small><?php echo date("d/m/Y", strtotime($selected_date)); ?></small>
             </div>
             
             <div class="summary-card cost">
-                <h3><i class="fas fa-money-bill-wave"></i> Today's Cost</h3>
+                <h3>Cost</h3>
                 <div class="money"><?php echo number_format($cogs_today); ?> ₫</div>
                 <small>Cost of Goods Sold (COGS)</small>
             </div>
 
             <div class="summary-card profit">
-                <h3><i class="fas fa-hand-holding-usd"></i> Today's Gross Profit</h3>
+                <h3>Gross Profit</h3>
                 <div class="money"><?php echo number_format($profit_today); ?> ₫</div>
                 <small>Revenue - Cost</small>
             </div>
         </div>
         
-        <h3 style="margin-top: 40px;"><i class="fas fa-trophy"></i> Top 5 Best-Selling Products (By Quantity)</h3>
+        <h3 style="margin-top: 40px;">Top Products (<?php echo date("d/m/Y", strtotime($selected_date)); ?>)</h3>
         
         <div class="table-container">
             <table class="report-table">
@@ -136,7 +149,7 @@ $conn->close();
                 </tbody>
             </table>
         </div>
-        <h3 style="margin-top: 40px;"><i class="fas fa-chart-line"></i> Daily Performance History</h3>
+        <h3 style="margin-top: 40px;">Daily Performance History</h3>
         
         <div class="table-container">
             <table class="report-table">
@@ -157,7 +170,6 @@ $conn->close();
                             <tr>
                                 <td>
                                     <a href="sales_history.php?date=<?php echo $row['report_date']; ?>" class="btn-view-detail">
-                                        <i class="far fa-eye"></i> 
                                         <?php echo date("d/m/Y", strtotime($row['report_date'])); ?>
                                     </a>
                                     

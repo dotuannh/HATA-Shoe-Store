@@ -44,3 +44,12 @@ ALTER TABLE sales
 ADD COLUMN unit_cost_price DECIMAL(15, 0) NOT NULL;
 
 ALTER TABLE users ADD COLUMN remember_token VARCHAR(255) NULL;
+
+INSERT INTO users (username, password, email, role) 
+VALUES (
+    'admin', 
+    '$2y$10$xT6VQF8SPwBpaUqU/BhV2OT6HUXVl261CYBim.J7sT5.7vY/rdo2a', 
+    'admin@gmail.com', 
+    'admin' 
+)
+
