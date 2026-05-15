@@ -1,7 +1,7 @@
 <?php
 require_once 'db.php';
 $message = '';
-if (isset($_SESSION['user_id'])) {
+if (isset($_SESSION['user_id'])) [
     header("Location: pos.php");
     exit;
 }
