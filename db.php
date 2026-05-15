@@ -26,7 +26,7 @@ if (!isset($_SESSION['user_id']) && isset($_COOKIE['remember_user'])) {
         $stmt = $conn->prepare("SELECT id, username, role, remember_token FROM users WHERE id = ?");
         $stmt->bind_param("i", $uid);
         $stmt->execute();
-        $res = $stmt->get_result();
+        $res = $stmt->get_result()
 
         if ($res->num_rows == 1) {
             $user = $res->fetch_assoc();
