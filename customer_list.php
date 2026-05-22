@@ -1,5 +1,5 @@
 <?php
-require_once 'db.php';
+require_once 'db.php'
 check_login();
 
 // Lấy danh sách khách hàng đã mua
