@@ -105,3 +105,4 @@ erDiagram
     USERS ||--o{ PASSWORD_RESETS : "has"
     USERS ||--o{ SHOES : "manages"
     USERS ||--o{ SALES : "transacts"
+ 
